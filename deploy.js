@@ -2,9 +2,7 @@ import fetch from 'node-fetch';
 import FormData from 'form-data';
 import fs from 'fs';
 import path from 'path';
-import { createReadStream } from 'fs';
-import { pipeline } from 'stream/promises';
-import archiver from 'archiver'; // we'll need to add this dependency
+import archiver from 'archiver';
 
 const { NETLIFY_API_KEY } = process.env;
 
@@ -38,10 +36,7 @@ async function createNetlifySite(siteName) {
       Authorization: `Bearer ${NETLIFY_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      name: siteName,
-      // optional: custom domain, etc.
-    }),
+    body: JSON.stringify({ name: siteName }),
   });
   if (!response.ok) {
     const errorText = await response.text();
@@ -86,11 +81,11 @@ export async function deployToNetlifyFromFolder(siteName, buildFolder) {
   console.log('📦 Zipping build folder...');
   const zipBuffer = await zipFolder(buildFolder);
 
-  // 2. Create a new site (or we could accept an existing siteId)
+  // 2. Create a new site
   console.log('🌐 Creating Netlify site...');
   const site = await createNetlifySite(siteName);
   const siteId = site.id;
-  const siteUrl = site.ssl_url || site.url; // e.g., https://my-site.netlify.app
+  const siteUrl = site.ssl_url || site.url;
 
   // 3. Deploy the zip
   console.log('🚀 Deploying to Netlify...');
