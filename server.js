@@ -1,5 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
+import fs from 'fs';
 import { deployToNetlifyFromFolder } from './deploy.js';
 
 dotenv.config();
