@@ -31,3 +31,18 @@ app.post('/deploy', async (req, res) => {
 
 app.get('/', (req, res) => res.send('Netlify Deploy Service'));
 app.listen(port, host, () => console.log(`🚀 Running on ${host}:${port}`));
+
+// Debug endpoint to list files in test-site
+app.get('/debug/ls', (req, res) => {
+  const testFolder = '/opt/render/project/src/test-site';
+  try {
+    if (fs.existsSync(testFolder)) {
+      const files = fs.readdirSync(testFolder);
+      res.json({ path: testFolder, files, exists: true });
+    } else {
+      res.json({ path: testFolder, exists: false, error: 'Folder not found' });
+    }
+  } catch (e) {
+    res.json({ error: e.message });
+  }
+});
