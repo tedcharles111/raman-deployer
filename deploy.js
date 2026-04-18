@@ -1,8 +1,6 @@
 import fetch from 'node-fetch';
-import FormData from 'form-data';
 import fs from 'fs';
 import path from 'path';
-import { createReadStream } from 'fs';
 import archiver from 'archiver';
 import dotenv from 'dotenv';
 
@@ -13,7 +11,6 @@ if (!NETLIFY_API_KEY) throw new Error('Missing NETLIFY_API_KEY');
 
 async function zipFolder(folderPath) {
   return new Promise((resolve, reject) => {
-    // Verify folder exists and is not empty
     if (!fs.existsSync(folderPath)) {
       return reject(new Error(`Folder does not exist: ${folderPath}`));
     }
@@ -33,53 +30,34 @@ async function zipFolder(folderPath) {
   });
 }
 
-async function createNetlifySite(siteName) {
-  const url = 'https://api.netlify.com/api/v1/sites';
-  const response = await fetch(url, {
+async function createAndDeploySite(siteName, zipBuffer) {
+  // Create site with the zip file attached directly (raw binary)
+  const createUrl = 'https://api.netlify.com/api/v1/sites';
+  const createResponse = await fetch(createUrl, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${NETLIFY_API_KEY}`,
-      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${NETLIFY_API_KEY}`,
+      'Content-Type': 'application/zip',  // Critical: raw zip, not multipart
     },
-    body: JSON.stringify({ name: siteName }),
+    body: zipBuffer,
   });
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to create site: ${response.status} ${errorText}`);
+  if (!createResponse.ok) {
+    const errorText = await createResponse.text();
+    throw new Error(`Failed to create site: ${createResponse.status} ${errorText}`);
   }
-  return await response.json();
-}
-
-async function deployToNetlify(siteId, zipBuffer) {
-  const form = new FormData();
-  form.append('file', zipBuffer, { filename: 'site.zip', contentType: 'application/zip' });
-  const url = `https://api.netlify.com/api/v1/sites/${siteId}/deploys`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${NETLIFY_API_KEY}`,
-      ...form.getHeaders(),
-    },
-    body: form,
-  });
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Deploy failed: ${response.status} ${errorText}`);
-  }
-  return await response.json();
+  const site = await createResponse.json();
+  console.log(`✅ Site created: ${site.id}, URL: ${site.url}`);
+  return {
+    url: site.ssl_url || site.url,
+    siteId: site.id,
+    deployId: site.deploy_id || 'created',
+  };
 }
 
 export async function deployToNetlifyFromFolder(siteName, buildFolder) {
   console.log(`🚀 Deploying ${siteName} from ${buildFolder}`);
   const zipBuffer = await zipFolder(buildFolder);
   console.log(`📦 Zip size: ${zipBuffer.length} bytes`);
-  const site = await createNetlifySite(siteName);
-  console.log(`✅ Site created: ${site.id}`);
-  const deploy = await deployToNetlify(site.id, zipBuffer);
-  console.log(`✅ Deployed: ${deploy.id}`);
-  return {
-    url: site.ssl_url || site.url,
-    siteId: site.id,
-    deployId: deploy.id,
-  };
+  const result = await createAndDeploySite(siteName, zipBuffer);
+  return result;
 }
