@@ -1,53 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multiverse Demo App</title>
-    <style>
-        body {
-            font-family: system-ui, -apple-system, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin: 0;
-            padding: 20px;
-        }
-        .card {
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-            text-align: center;
-            max-width: 500px;
-        }
-        h1 { color: #333; margin-bottom: 10px; }
-        p { color: #666; line-height: 1.5; }
-        .button {
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            margin-top: 20px;
-        }
-        .button:hover { background: #5a67d8; }
-        .timestamp { font-size: 12px; color: #aaa; margin-top: 20px; }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <h1>🎉 Deployed from Multiverse!</h1>
-        <p>This web app was built and deployed automatically using your Netlify microservice.</p>
-        <button class="button" onclick="alert('Hello from Multiverse!')">Click Me</button>
-        <div class="timestamp" id="time"></div>
-    </div>
-    <script>
-        document.getElementById('time').innerHTML = 'Deployed at: ' + new Date().toLocaleString();
-    </script>
-</body>
+<html>
+<head><title>Test Site</title></head>
+<body><h1>Deployed from Netlify microservice</h1></body>
 </html>
