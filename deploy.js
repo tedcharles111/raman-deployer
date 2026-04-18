@@ -2,19 +2,27 @@ import fetch from 'node-fetch';
 import FormData from 'form-data';
 import fs from 'fs';
 import path from 'path';
+import { createReadStream } from 'fs';
 import archiver from 'archiver';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const { NETLIFY_API_KEY } = process.env;
+if (!NETLIFY_API_KEY) throw new Error('Missing NETLIFY_API_KEY');
 
-if (!NETLIFY_API_KEY) {
-  throw new Error('Missing NETLIFY_API_KEY environment variable');
-}
-
-/**
- * Zip a folder into a buffer
- */
 async function zipFolder(folderPath) {
   return new Promise((resolve, reject) => {
+    // Verify folder exists and is not empty
+    if (!fs.existsSync(folderPath)) {
+      return reject(new Error(`Folder does not exist: ${folderPath}`));
+    }
+    const files = fs.readdirSync(folderPath);
+    if (files.length === 0) {
+      return reject(new Error(`Folder is empty: ${folderPath}`));
+    }
+    console.log(`📁 Zipping ${files.length} files from ${folderPath}`);
+
     const chunks = [];
     const archive = archiver('zip', { zlib: { level: 9 } });
     archive.on('error', reject);
@@ -25,9 +33,6 @@ async function zipFolder(folderPath) {
   });
 }
 
-/**
- * Create a new Netlify site
- */
 async function createNetlifySite(siteName) {
   const url = 'https://api.netlify.com/api/v1/sites';
   const response = await fetch(url, {
@@ -42,17 +47,12 @@ async function createNetlifySite(siteName) {
     const errorText = await response.text();
     throw new Error(`Failed to create site: ${response.status} ${errorText}`);
   }
-  const site = await response.json();
-  return site;
+  return await response.json();
 }
 
-/**
- * Deploy a zip file to an existing Netlify site
- */
 async function deployToNetlify(siteId, zipBuffer) {
   const form = new FormData();
   form.append('file', zipBuffer, { filename: 'site.zip', contentType: 'application/zip' });
-
   const url = `https://api.netlify.com/api/v1/sites/${siteId}/deploys`;
   const response = await fetch(url, {
     method: 'POST',
@@ -66,34 +66,20 @@ async function deployToNetlify(siteId, zipBuffer) {
     const errorText = await response.text();
     throw new Error(`Deploy failed: ${response.status} ${errorText}`);
   }
-  const deploy = await response.json();
-  return deploy;
+  return await response.json();
 }
 
-/**
- * Main function: deploy a folder to Netlify.
- * @param {string} siteName - Desired site name (must be globally unique)
- * @param {string} buildFolder - Absolute path to built static site
- * @returns {Promise<{url: string, siteId: string, deployId: string}>}
- */
 export async function deployToNetlifyFromFolder(siteName, buildFolder) {
-  // 1. Zip the folder
-  console.log('📦 Zipping build folder...');
+  console.log(`🚀 Deploying ${siteName} from ${buildFolder}`);
   const zipBuffer = await zipFolder(buildFolder);
-
-  // 2. Create a new site
-  console.log('🌐 Creating Netlify site...');
+  console.log(`📦 Zip size: ${zipBuffer.length} bytes`);
   const site = await createNetlifySite(siteName);
-  const siteId = site.id;
-  const siteUrl = site.ssl_url || site.url;
-
-  // 3. Deploy the zip
-  console.log('🚀 Deploying to Netlify...');
-  const deploy = await deployToNetlify(siteId, zipBuffer);
-
+  console.log(`✅ Site created: ${site.id}`);
+  const deploy = await deployToNetlify(site.id, zipBuffer);
+  console.log(`✅ Deployed: ${deploy.id}`);
   return {
-    url: siteUrl,
-    siteId,
+    url: site.ssl_url || site.url,
+    siteId: site.id,
     deployId: deploy.id,
   };
 }
