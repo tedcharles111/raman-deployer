@@ -1,27 +1,51 @@
 import express from 'express';
-import dotenv from 'dotenv';
+import multer from 'multer';
+import AdmZip from 'adm-zip';
 import fs from 'fs';
+import path from 'path';
+import dotenv from 'dotenv';
 import { deployToNetlifyFromFolder } from './deploy.js';
 
 dotenv.config();
+
 const app = express();
 const port = process.env.PORT || 3000;
 const host = '0.0.0.0';
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 app.use(express.json());
 
 app.get('/health', (req, res) => res.status(200).send('OK'));
 
-app.post('/deploy', async (req, res) => {
+app.post('/deploy', upload.single('file'), async (req, res) => {
   try {
-    const { siteName, buildFolder } = req.body;
-    if (!siteName || !buildFolder) {
-      return res.status(400).json({ error: 'siteName and buildFolder are required' });
+    const { siteName } = req.body;
+    const file = req.file;
+
+    if (!siteName) {
+      return res.status(400).json({ error: 'siteName is required' });
     }
-    if (!fs.existsSync(buildFolder)) {
-      return res.status(400).json({ error: `Build folder does not exist: ${buildFolder}` });
+    if (!file) {
+      return res.status(400).json({ error: 'No file uploaded' });
     }
-    const result = await deployToNetlifyFromFolder(siteName, buildFolder);
+
+    // Create temp folder and extract zip
+    const tempDir = path.join('/tmp', `netlify-${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    const zipPath = path.join(tempDir, 'site.zip');
+    fs.writeFileSync(zipPath, file.buffer);
+
+    // Extract using adm-zip
+    const zip = new AdmZip(zipPath);
+    zip.extractAllTo(tempDir, true);
+
+    // Deploy the extracted folder
+    const result = await deployToNetlifyFromFolder(siteName, tempDir);
+
+    // Cleanup
+    fs.rmSync(tempDir, { recursive: true, force: true });
+
     res.json(result);
   } catch (error) {
     console.error('Deployment error:', error);
@@ -29,17 +53,16 @@ app.post('/deploy', async (req, res) => {
   }
 });
 
-// Debug endpoint to check test-site folder
-app.get('/debug/ls', (req, res) => {
-  const folder = '/opt/render/project/src/test-site';
-  let files = [];
-  try {
-    if (fs.existsSync(folder)) files = fs.readdirSync(folder);
-    res.json({ exists: fs.existsSync(folder), files, path: folder });
-  } catch(e) {
-    res.json({ error: e.message });
-  }
+app.get('/', (req, res) => {
+  res.send(`
+    <h1>Netlify Deploy Service</h1>
+    <p>Upload a zip via POST /deploy with multipart/form-data.</p>
+    <pre>curl -X POST https://raman-deployer.onrender.com/deploy -F "siteName=my-site" -F "file=@site.zip"</pre>
+  `);
 });
 
-app.get('/', (req, res) => res.send('Netlify Deploy Service (fixed)'));
-app.listen(port, host, () => console.log(`🚀 Running on ${host}:${port}`));
+const server = app.listen(port, host, () => {
+  console.log(`🚀 Running on ${host}:${port}`);
+});
+server.keepAliveTimeout = 120000;
+server.headersTimeout = 120000;
