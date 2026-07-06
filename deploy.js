@@ -31,13 +31,12 @@ async function zipFolder(folderPath) {
 }
 
 async function createAndDeploySite(siteName, zipBuffer) {
-  // Create site with the zip file attached directly (raw binary)
   const createUrl = 'https://api.netlify.com/api/v1/sites';
   const createResponse = await fetch(createUrl, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${NETLIFY_API_KEY}`,
-      'Content-Type': 'application/zip',  // Critical: raw zip, not multipart
+      'Content-Type': 'application/zip',
     },
     body: zipBuffer,
   });
